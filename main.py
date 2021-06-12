@@ -65,11 +65,15 @@ def get_info(ob):
         message_id = ob.id
         chat_id = ob.chat.id
     else:
-        message_id = ob.message.id
-        chat_id = ob.message.chat.id
+        try:
+            message_id = ob.message.id
+            chat_id = ob.message.chat.id
+        except Exception:
+            message_id = chat_id = None
     user_id = ob.from_user.id
     first_name = ob.from_user.first_name
-    return [user_id, first_name, chat_id, message_id]
+    return {"user_id":user_id, "first_name":first_name, 
+                "chat_id":chat_id, "message_id":message_id}
 
 
 @BOT.message_handler(commands=['start', 'help'])
@@ -77,7 +81,7 @@ def command_handler(message):
     text = str(message.text)
     user_info = get_info(message)
     if text.startswith(('/start')):
-        send_page(*user_info,
+        send_page(*user_info.values(),
                     page_number=1, is_start=True)
     elif text.startswith('/help'):
         BOT.reply_to(message, messages.get('help'))
@@ -87,11 +91,11 @@ def message_handler(message):
     text = str(message.text)
     user_info = get_info(message)
     if text.startswith('فتح القران'):
-        send_page(*user_info,
+        send_page(*user_info.values(),
                     page_number=1, send=True)
     elif text.startswith(('فتح صفحه', 'جلب صفحه','فتح صفحة', 'جلب صفحة')):
         try:
-            open_page(text, *user_info, with_markup= not text.startswith(('جلب صفحه', 'جلب صفحة')))
+            open_page(text, *user_info.values(), with_markup= not text.startswith(('جلب صفحه', 'جلب صفحة')))
         except Exception as err:
             BOT.reply_to(message, err)
     elif text in ['سورس', 'السورس']:
@@ -103,7 +107,7 @@ def query_handler(call):
     page_number, user_id, first_name = call.data.split(maxsplit=3)
     requester = call.from_user.id
     if int(user_id) == requester:
-        send_page(*user_info, 
+        send_page(*user_info.values(), 
                     int(page_number), is_start=False)
     else:
         BOT.answer_callback_query(call.id, f"هذا المصحف خاص بـ {first_name}")
