@@ -5,7 +5,12 @@ import urllib.request
 import time
 import json
 import os
+import logging
 
+logging.basicConfig(filename="bot.log", format="%(asctime)s - %(levelname)s - %(message)s",
+                        datefmt="%Y/%m/%d %I:%M:%S %p", level=0)
+
+SUDO_ID = int() # your id 
 TOKEN = ""
 BOT = telebot.TeleBot(TOKEN)
 bot_name = BOT.get_me().first_name
@@ -29,6 +34,7 @@ def send_page(user_id, first_name, chat_id,
     page_number, page_url= get_page(page_number, is_start)
     markup = get_markup(user_id, first_name, page_number,
                             is_start, with_markup)
+    logging.info(f"send_page:is_start, with_markup, send = {is_start, with_markup, send}")
     if is_start or send:
         BOT.send_photo(chat_id, page_url if page_url else open('./img/start_img.jpg', 'rb'),
                         reply_to_message_id=message_id,reply_markup=markup if with_markup else None,
@@ -120,6 +126,7 @@ def query_handler(call):
     user_info = get_info(call)
     page_number, user_id, first_name = call.data.split(maxsplit=3)
     requester = call.from_user.id
+    logging.info(f"query_handler:user_id == requester ={int(user_id) == requester}")
     if int(user_id) == requester:
         send_page(*user_info.values(), 
                     int(page_number), is_start=False)
@@ -141,6 +148,7 @@ def inline_handler(inline_query):
             msg = str(err)
     else:
         msg = "الاوامر:\nجلب صفحة"
+    logging.info(f"inline_handler:true_text={true_text}")
     markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(bot_name, bot_url))
     if true_text:
         r = types.InlineQueryResultPhoto('1',photo_url=msg, thumb_url=msg, photo_width=20, photo_height=20,
@@ -151,8 +159,10 @@ def inline_handler(inline_query):
     BOT.answer_inline_query(inline_query.id, [r], cache_time=1)
 while True:
     print(f"Start\t{bot_name} @{bot_username}\n{bot_url}")
+    logging.info(f"Start @{bot_username}")
     try:
         BOT.polling(none_stop=True, interval=0, timeout=0)
     except Exception as err:
-        print(err)
+        logging.error(str(err))
+        BOT.send_document(SUDO_ID, open('bot.log', 'rb'), caption=str(err))
         time.sleep(10)
