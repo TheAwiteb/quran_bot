@@ -8,7 +8,10 @@ import os
 
 TOKEN = ""
 BOT = telebot.TeleBot(TOKEN)
-
+bot_name = BOT.get_me().first_name
+bot_username = BOT.get_me().username
+bot_url = "https://t.me/"+bot_username
+error_img = "https://image.freepik.com/free-vector/error-neon-signs-style-text_118419-3023.jpg"
 PAGES_URL = "http://mp3quran.net/api/quran_pages_arabic/"
 with open('./messages.json', 'r') as j:
     messages = json.load(j)
@@ -23,18 +26,9 @@ def get_page(page_number, is_start):
 def send_page(user_id, first_name, chat_id, 
                 message_id, page_number, is_start=False, 
                     send=False, with_markup=True):
-    markup = types.InlineKeyboardMarkup()
-    button = types.InlineKeyboardButton
     page_number, page_url= get_page(page_number, is_start)
-    next_button = button(text="▶️الصفحة التالية", callback_data=f"{page_number + 1} {user_id} {first_name}")\
-                    if with_markup else None
-    back_button = button(text="◀️الصفحة السابقة", callback_data=f"{page_number - 1} {user_id} {first_name}")\
-                    if with_markup else None
-    start_button = button(text="فتح المصحف 🕋", callback_data=f"{1} {user_id} {first_name}")\
-                    if with_markup else None
-    buttons_list = [start_button] if is_start else [back_button, next_button]\
-                    if with_markup else []
-    markup.add(*buttons_list)
+    markup = get_markup(user_id, first_name, page_number,
+                            is_start, with_markup)
     if is_start or send:
         BOT.send_photo(chat_id, page_url if page_url else open('./img/start_img.jpg', 'rb'),
                         reply_to_message_id=message_id,reply_markup=markup if with_markup else None,
@@ -46,15 +40,34 @@ def send_page(user_id, first_name, chat_id,
                                         reply_markup=markup if with_markup else None)
         os.remove(f"{page_number}.png")
 
-def open_page(text, user_id, first_name, chat_id, 
-                message_id, with_markup):
+def get_markup(user_id, first_name, page_number,
+                    is_start, with_markup):
+    markup = types.InlineKeyboardMarkup()
+    button = types.InlineKeyboardButton
+    next_button = button(text="▶️الصفحة التالية", callback_data=f"{page_number + 1} {user_id} {first_name}")\
+                    if with_markup else None
+    back_button = button(text="◀️الصفحة السابقة", callback_data=f"{page_number - 1} {user_id} {first_name}")\
+                    if with_markup else None
+    start_button = button(text="فتح المصحف 🕋", callback_data=f"{1} {user_id} {first_name}")\
+                    if with_markup else None
+    buttons_list = [start_button] if is_start else [back_button, next_button]\
+                    if with_markup else []
+    markup.add(*buttons_list)
+    return markup
+
+def open_page(text, user_id=None, first_name=None,
+                chat_id=None,message_id=None,
+                    with_markup=None, send=True):
     s_text = text.split()
     user_info = [user_id, first_name, chat_id, message_id]
     if len(s_text) > 2 and s_text[2].isnumeric():
         page_number = int(s_text[2])
         if page_number > 0 and page_number < 604:
-            send_page(*user_info, 
-                        page_number, send=True, with_markup=with_markup)
+            if send:
+                send_page(*user_info,
+                            page_number, send=True, with_markup=with_markup)
+            else:
+                return get_page(page_number,is_start=False)
         else:
             raise Exception("عدد صفحات القران 604")
     else:
@@ -84,7 +97,8 @@ def command_handler(message):
         send_page(*user_info.values(),
                     page_number=1, is_start=True)
     elif text.startswith('/help'):
-        BOT.reply_to(message, messages.get('help'))
+        BOT.reply_to(message, messages.get('help').format(bot_username), 
+                        parse_mode="Markdown", disable_web_page_preview=True)
 
 @BOT.message_handler(func=lambda msg:True, content_types=['text'])
 def message_handler(message):
@@ -112,9 +126,31 @@ def query_handler(call):
     else:
         BOT.answer_callback_query(call.id, f"هذا المصحف خاص بـ {first_name}")
 
-
+@BOT.inline_handler(lambda query: True)
+def inline_handler(inline_query):
+    text = inline_query.query
+    true_text = False
+    page_number = None
+    if text == '':
+        msg = "الاوامر:\nجلب صفحة"
+    elif text.startswith(('جلب صفحه', 'جلب صفحة')):
+        try:
+            page_number, msg = open_page(text,send=False)
+            true_text = True
+        except Exception as err:
+            msg = str(err)
+    else:
+        msg = "الاوامر:\nجلب صفحة"
+    markup = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(bot_name, bot_url))
+    if true_text:
+        r = types.InlineQueryResultPhoto('1',photo_url=msg, thumb_url=msg, photo_width=20, photo_height=20,
+                                            caption=f"صفحة {page_number}", reply_markup=markup)
+    else:
+        r = types.InlineQueryResultArticle('1', title="ERROR", input_message_content=types.InputTextMessageContent("ERROR"),
+                                            description=msg, thumb_url=error_img, thumb_height=20, thumb_width=20)
+    BOT.answer_inline_query(inline_query.id, [r], cache_time=1)
 while True:
-    print(f"Start")
+    print(f"Start\t{bot_name} @{bot_username}\n{bot_url}")
     try:
         BOT.polling(none_stop=True, interval=0, timeout=0)
     except Exception as err:
