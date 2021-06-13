@@ -124,7 +124,7 @@ def message_handler(message):
 @BOT.callback_query_handler(func=lambda call:True)
 def query_handler(call):
     user_info = get_info(call)
-    page_number, user_id, first_name = call.data.split(maxsplit=3)
+    page_number, user_id, first_name = call.data.split(maxsplit=2)
     requester = call.from_user.id
     logging.info(f"query_handler:user_id == requester ={int(user_id) == requester}")
     if int(user_id) == requester:
